@@ -23,19 +23,19 @@ A real-time vehicle tracking system with route planning and geofencing capabilit
 ### Frontend (.env)
 
 Required Google Maps API key
-VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+ -VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
 WebSocket connection URL
-VITE_WEBSOCKET_URL=ws://localhost:3001 
+  -VITE_WEBSOCKET_URL=ws://localhost:3001 
 
 ## Development
-VITE_WEBSOCKET_URL=wss://your-production-url.com 
+ -VITE_WEBSOCKET_URL=wss://your-production-url.com 
 
 ### Backend (.env)
 
 Server configuration
-PORT=3001
-NODE_ENV=development
-CORS_ORIGIN=http://localhost:5173
+-PORT=3001
+-NODE_ENV=development
+-CORS_ORIGIN=http://localhost:5173
 
 
 ## Key Components
