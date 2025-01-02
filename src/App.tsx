@@ -32,25 +32,40 @@ function App() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <Toaster position="top-right" />
+    <div className="flex min-h-screen bg-gray-50">
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          className: 'glass',
+          duration: 4000,
+          style: {
+            background: 'rgba(255, 255, 255, 0.9)',
+            color: '#1f2937',
+            padding: '16px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.08)',
+          },
+        }}
+      />
+      
       <Sidebar onNavigate={setCurrentPage} currentPage={currentPage} />
       
-      <div className={`flex-1 transition-all duration-300 ${
-        isSidebarCollapsed ? 'ml-16' : 'ml-64'
-      }`}>
-        <nav className="bg-white shadow-sm">
+      <div className={`
+        flex-1 transition-all duration-300
+        lg:ml-64 
+        ${isSidebarCollapsed ? 'lg:ml-16' : ''}
+      `}>
+        <nav className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <div className="flex items-center">
-                <MapPin className="w-8 h-8 text-blue-500" />
-                <span className="ml-2 text-xl font-semibold">Vehicle Tracker</span>
+              <div className="flex items-center space-x-3">
+                <span className="text-xl font-bold text-gray-800 ml-8 lg:ml-0">FleetTracker</span>
               </div>
             </div>
           </div>
         </nav>
 
-        <main className="max-w-7xl mx-auto py-6">
+        <main className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
           {renderPage()}
         </main>
       </div>

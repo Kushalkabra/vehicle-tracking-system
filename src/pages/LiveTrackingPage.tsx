@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useVehicleStore } from '../stores/vehicleStore';
-import { MapIcon, Navigation, Clock, Route } from 'lucide-react';
+import { MapIcon, Navigation, Clock, Route, MapPin } from 'lucide-react';
 import MapView from '../components/MapView';
 import { toast } from 'react-hot-toast';
 
@@ -117,100 +117,119 @@ const LiveTrackingPage: React.FC = () => {
   }, [driverLocation, geofences]);
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-6">Live Tracking</h2>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-800">Live Tracking</h2>
+        {destination && (
+          <div className="flex items-center space-x-2 px-4 py-2 bg-white rounded-xl shadow-sm">
+            <MapPin size={18} className="text-primary-500" />
+            <span className="text-gray-600">{destination.address}</span>
+          </div>
+        )}
+      </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-3xl mx-auto">
-            <div className="flex items-center mb-4">
-              <MapIcon className="w-6 h-6 text-blue-500 mr-2" />
-              <h3 className="text-lg font-semibold">Live Location</h3>
-            </div>
-            <div className="h-[400px] rounded-lg overflow-hidden border border-gray-200">
-              <MapView
-                center={driverLocation || { lat: 40.7128, lng: -74.0060 }}
-                zoom={12}
-                routePath={trackingInfo?.routePath}
-              />
+          <div className="bg-white rounded-xl shadow-card overflow-hidden">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                    <Navigation className="w-5 h-5 text-primary-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-800">Live Location</h3>
+                </div>
+                {trackingInfo && (
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full">
+                      <Clock size={14} />
+                      <span>{trackingInfo.remainingTime}</span>
+                    </div>
+                    <div className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full">
+                      <Route size={14} />
+                      <span>{trackingInfo.remainingDistance}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="h-[600px] rounded-xl overflow-hidden border border-gray-100">
+                <MapView
+                  center={driverLocation || { lat: 40.7128, lng: -74.0060 }}
+                  zoom={12}
+                  routePath={trackingInfo?.routePath}
+                />
+              </div>
             </div>
           </div>
         </div>
 
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Tracking Details</h3>
+          <div className="bg-white rounded-xl shadow-card p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Tracking Details</h3>
             
             <div className="space-y-4">
               {!destination ? (
-                <div className="text-center p-4">
-                  <p className="text-gray-500 mb-2">No destination set</p>
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center mx-auto mb-4">
+                    <MapPin className="w-8 h-8 text-primary-500" />
+                  </div>
+                  <p className="text-gray-500 mb-4">No destination set</p>
                   <button
                     onClick={() => onNavigate('route-planning')}
-                    className="text-blue-500 hover:text-blue-600"
+                    className="text-primary-500 hover:text-primary-600 font-medium"
                   >
                     Set destination in Route Planning
                   </button>
                 </div>
               ) : !trackingInfo ? (
-                <div>
-                  <p className="text-gray-700 mb-2">
-                    Destination: {destination.address}
-                  </p>
+                <div className="space-y-4">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-gray-700 font-medium mb-1">Destination</p>
+                    <p className="text-gray-600">{destination.address}</p>
+                  </div>
                   <button
                     onClick={startTracking}
-                    className="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                    className="w-full bg-primary-500 text-white px-4 py-3 rounded-lg hover:bg-primary-600 transition-colors duration-200 flex items-center justify-center space-x-2"
                   >
-                    Start Tracking
+                    <Navigation className="w-5 h-5" />
+                    <span>Start Tracking</span>
                   </button>
                 </div>
               ) : (
-                <>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Destination</p>
-                      <p className="font-medium">{destination.address}</p>
+                <div className="space-y-6">
+                  {/* Progress section */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Progress</span>
+                      <span className="font-medium">{trackingInfo.progress.toFixed(1)}%</span>
                     </div>
-                    <div>
-                      <div className="flex items-center mb-2">
-                        <Navigation className="w-4 h-4 text-blue-500 mr-2" />
-                        <span className="text-sm font-medium">Remaining Distance</span>
-                      </div>
-                      <p className="text-lg font-semibold">{trackingInfo.remainingDistance}</p>
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary-500 rounded-full transition-all duration-500"
+                        style={{ width: `${trackingInfo.progress}%` }}
+                      />
                     </div>
+                  </div>
 
-                    <div>
-                      <div className="flex items-center mb-2">
-                        <Clock className="w-4 h-4 text-blue-500 mr-2" />
-                        <span className="text-sm font-medium">ETA</span>
-                      </div>
-                      <p className="text-lg font-semibold">{trackingInfo.remainingTime}</p>
+                  {/* Stats */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-500 mb-1">Time Left</p>
+                      <p className="text-lg font-semibold text-gray-800">{trackingInfo.remainingTime}</p>
                     </div>
-
-                    <div>
-                      <div className="flex items-center mb-2">
-                        <Route className="w-4 h-4 text-blue-500 mr-2" />
-                        <span className="text-sm font-medium">Progress</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2.5">
-                        <div 
-                          className="bg-blue-500 h-2.5 rounded-full transition-all duration-500"
-                          style={{ width: `${trackingInfo.progress}%` }}
-                        />
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {trackingInfo.progress.toFixed(1)}% Complete
-                      </p>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-500 mb-1">Distance</p>
+                      <p className="text-lg font-semibold text-gray-800">{trackingInfo.remainingDistance}</p>
                     </div>
                   </div>
 
                   <button
                     onClick={() => setTrackingInfo(null)}
-                    className="w-full mt-4 bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="w-full bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors duration-200"
                   >
                     Stop Tracking
                   </button>
-                </>
+                </div>
               )}
             </div>
           </div>

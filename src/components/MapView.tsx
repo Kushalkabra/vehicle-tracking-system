@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 import { useVehicleStore } from '../stores/vehicleStore';
+import { MapIcon } from 'lucide-react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -151,7 +152,24 @@ const MapView: React.FC<MapViewProps> = ({ center, zoom, routePath, onMapClick, 
     };
   }, [geofences, showGeofences]);
 
-  return <div ref={mapRef} className="w-full h-full rounded-lg" />;
+  return (
+    <div className="relative w-full h-[300px] sm:h-[400px] lg:h-[600px] rounded-xl overflow-hidden border border-neutral-200 shadow-card group">
+      <div ref={mapRef} className="w-full h-full" />
+      {!mapInstanceRef.current && (
+        <div className="absolute inset-0 bg-neutral-50 flex items-center justify-center">
+          <div className="flex flex-col items-center space-y-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+            <p className="text-sm text-neutral-500">Loading map...</p>
+          </div>
+        </div>
+      )}
+      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <button className="p-2 bg-white/90 backdrop-blur-sm rounded-lg shadow-soft hover:bg-white transition-colors">
+          <MapIcon className="w-5 h-5 text-neutral-600" />
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export default MapView;

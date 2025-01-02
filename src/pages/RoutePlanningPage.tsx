@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useVehicleStore } from '../stores/vehicleStore';
-import { MapIcon, LocateFixed } from 'lucide-react';
+import { MapIcon, LocateFixed, Clock, MapPin, Route } from 'lucide-react';
 import MapView from '../components/MapView';
 import GeofenceControl from '../components/GeofenceControl';
 import { generateRandomColor } from '../utils/colors';
@@ -113,94 +113,111 @@ const RoutePlanningPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-6">Route Planning</h2>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div className="lg:col-span-3">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-3xl mx-auto">
-            <div className="flex items-center mb-4">
-              <MapIcon className="w-6 h-6 text-blue-500 mr-2" />
-              <h3 className="text-lg font-semibold">Route Map</h3>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-800">Route Planning</h2>
+        <div className="flex items-center space-x-4">
+          {routeInfo && (
+            <div className="flex items-center space-x-2 text-sm bg-primary-50 text-primary-700 px-3 py-1.5 rounded-full">
+              <Clock size={14} />
+              <span>{routeInfo.duration}</span>
+              <span>•</span>
+              <span>{routeInfo.distance}</span>
             </div>
-            <div className="h-[400px] rounded-lg overflow-hidden border border-gray-200">
-              <MapView
-                center={driverLocation || { lat: 40.7128, lng: -74.0060 }}
-                zoom={12}
-                routePath={routeInfo?.path}
-                onMapClick={handleMapClick}
-              />
+          )}
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3">
+          <div className="bg-white rounded-xl shadow-card overflow-hidden">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <MapIcon className="w-6 h-6 text-primary-500" />
+                  <h3 className="text-lg font-semibold text-gray-800">Route Map</h3>
+                </div>
+                {isGeofenceMode && (
+                  <span className="text-sm px-3 py-1 bg-primary-50 text-primary-600 rounded-full animate-pulse">
+                    Click on map to place geofence
+                  </span>
+                )}
+              </div>
+              <div className="h-[600px] rounded-xl overflow-hidden border border-gray-100">
+                <MapView
+                  center={driverLocation || { lat: 40.7128, lng: -74.0060 }}
+                  zoom={12}
+                  routePath={routeInfo?.path}
+                  onMapClick={handleMapClick}
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-1">
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Route Details</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Current Location
-                  </label>
-                  <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <LocateFixed size={16} />
-                    <span>
-                      {driverLocation 
-                        ? `${driverLocation.lat.toFixed(4)}, ${driverLocation.lng.toFixed(4)}`
-                        : 'No location available'}
-                    </span>
-                  </div>
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white rounded-xl shadow-card p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Route Details</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">
+                  Current Location
+                </label>
+                <div className="flex items-center space-x-2 text-sm text-gray-500 bg-gray-50 p-2 rounded-lg">
+                  <LocateFixed size={16} />
+                  <span>
+                    {driverLocation 
+                      ? `${driverLocation.lat.toFixed(4)}, ${driverLocation.lng.toFixed(4)}`
+                      : 'No location available'}
+                  </span>
                 </div>
+              </div>
 
-                <div>
-                  <label htmlFor="destination" className="block text-sm font-medium text-gray-700 mb-1">
-                    Destination
-                  </label>
+              <div>
+                <label htmlFor="destination" className="block text-sm font-medium text-gray-600 mb-1">
+                  Destination
+                </label>
+                <div className="relative">
                   <input
                     type="text"
                     id="destination"
                     value={destination}
                     onChange={(e) => setDestination(e.target.value)}
                     placeholder="Enter destination address"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
                   />
-                </div>
-
-                {error && (
-                  <p className="text-sm text-red-500">{error}</p>
-                )}
-
-                <button
-                  onClick={calculateRoute}
-                  className="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-                >
-                  Calculate Route
-                </button>
-
-                {routeInfo && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <h4 className="font-medium mb-2">Route Information</h4>
-                    <div className="space-y-1 text-sm">
-                      <p>Distance: {routeInfo.distance}</p>
-                      <p>Duration: {routeInfo.duration}</p>
-                    </div>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <MapPin size={18} className="text-gray-400" />
                   </div>
-                )}
+                </div>
               </div>
-            </div>
 
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <GeofenceControl
-                onAddMode={() => setIsGeofenceMode(!isGeofenceMode)}
-                isAddMode={isGeofenceMode}
-                geofenceName={geofenceName}
-                geofenceRadius={geofenceRadius}
-                onNameChange={setGeofenceName}
-                onRadiusChange={setGeofenceRadius}
-              />
+              {error && (
+                <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={calculateRoute}
+                className="w-full bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition-colors duration-200 flex items-center justify-center space-x-2"
+              >
+                <Route size={18} />
+                <span>Calculate Route</span>
+              </button>
             </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-card p-6">
+            <GeofenceControl
+              onAddMode={() => setIsGeofenceMode(!isGeofenceMode)}
+              isAddMode={isGeofenceMode}
+              geofenceName={geofenceName}
+              geofenceRadius={geofenceRadius}
+              onNameChange={setGeofenceName}
+              onRadiusChange={setGeofenceRadius}
+            />
           </div>
         </div>
       </div>
