@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 import { useVehicleStore } from '../stores/vehicleStore';
-import { MapIcon } from 'lucide-react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const STOP_THRESHOLD = 30 * 1000; // 30 seconds for testing
 
 interface MapViewProps {
   center: google.maps.LatLngLiteral;
@@ -11,146 +11,226 @@ interface MapViewProps {
   routePath?: google.maps.LatLngLiteral[];
   onMapClick?: (e: google.maps.MapMouseEvent) => void;
   showGeofences?: boolean;
+  showRouteHistory?: boolean;
+  isTestEnvironment?: boolean;
+  directionsRenderer?: google.maps.DirectionsRenderer | null;
+  onMapLoad?: (map: google.maps.Map) => void;
 }
 
-const MapView: React.FC<MapViewProps> = ({ center, zoom, routePath, onMapClick, showGeofences = true }) => {
+const MapView: React.FC<MapViewProps> = ({ 
+  center, 
+  zoom, 
+  onMapClick, 
+  showGeofences = true,
+  showRouteHistory = true,
+  isTestEnvironment = false,
+  directionsRenderer = null,
+  onMapLoad
+}) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const routeLineRef = useRef<google.maps.Polyline | null>(null);
+  const stopMarkersRef = useRef<google.maps.Marker[]>([]);
+  const vehicleMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  
+  const routeHistory = useVehicleStore((state) => 
+    isTestEnvironment ? state.testRouteHistory : state.driverRouteHistory
+  );
   const vehicles = useVehicleStore((state) => state.vehicles);
-  const geofences = useVehicleStore((state) => state.geofences);
-  const geofenceCirclesRef = useRef<Map<string, google.maps.Circle>>(new Map());
 
   // Initialize map
   useEffect(() => {
     const loader = new Loader({
       apiKey: GOOGLE_MAPS_API_KEY,
       version: 'weekly',
+      libraries: ['geometry', 'places', 'directions']
     });
 
-    loader.load().then(() => {
-      if (mapRef.current && !mapInstanceRef.current) {
-        mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-          center,
-          zoom,
-          styles: [
-            {
-              featureType: 'poi',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }],
-            },
-          ],
-        });
+    loader.load()
+      .then(() => {
+        if (mapRef.current && !mapInstanceRef.current) {
+          const map = new google.maps.Map(mapRef.current, {
+            center,
+            zoom,
+            styles: [
+              {
+                featureType: "poi",
+                elementType: "labels",
+                stylers: [{ visibility: "off" }]
+              }
+            ]
+          });
+          
+          mapInstanceRef.current = map;
+          
+          if (onMapClick) {
+            map.addListener('click', onMapClick);
+          }
+
+          // Notify parent when map is ready
+          if (onMapLoad) {
+            onMapLoad(map);
+          }
+        }
+      })
+      .catch((error) => {
+        console.error('Error loading Google Maps:', error);
+      });
+
+    return () => {
+      if (mapInstanceRef.current && onMapClick) {
+        google.maps.event.clearListeners(mapInstanceRef.current, 'click');
       }
-    });
+    };
   }, []);
 
-  // Update map center when center prop changes
+  // Update map center and zoom when props change
   useEffect(() => {
     if (mapInstanceRef.current) {
       mapInstanceRef.current.setCenter(center);
+      mapInstanceRef.current.setZoom(zoom);
     }
-  }, [center.lat, center.lng]);
+  }, [center, zoom]);
 
-  // Update markers
+  // Update vehicle markers
   useEffect(() => {
     if (!mapInstanceRef.current) return;
 
-    // Remove markers that are no longer in the vehicles list
-    const currentVehicleIds = new Set(vehicles.map(v => v.id));
-    markersRef.current.forEach((marker, id) => {
+    // Only show non-test vehicles in production pages
+    const visibleVehicles = isTestEnvironment 
+      ? vehicles 
+      : vehicles.filter(v => !v.id.includes('test'));
+
+    // Remove markers for vehicles that no longer exist
+    const currentVehicleIds = new Set(visibleVehicles.map(v => v.id));
+    vehicleMarkersRef.current.forEach((marker, id) => {
       if (!currentVehicleIds.has(id)) {
         marker.setMap(null);
-        markersRef.current.delete(id);
+        vehicleMarkersRef.current.delete(id);
       }
     });
 
     // Update or create markers for current vehicles
-    vehicles.forEach((vehicle) => {
-      let marker = markersRef.current.get(vehicle.id);
+    visibleVehicles.forEach(vehicle => {
+      let marker = vehicleMarkersRef.current.get(vehicle.id);
 
       if (!marker) {
+        // Create new marker with different icon for test vehicle
+        const isTestVehicle = vehicle.id.includes('test');
         marker = new google.maps.Marker({
           position: vehicle.position,
           map: mapInstanceRef.current,
           title: vehicle.name,
           icon: {
             path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-            scale: 6,
-            fillColor: vehicle.status === 'active' ? '#4CAF50' : '#9E9E9E',
+            scale: isTestVehicle ? 8 : 6,
+            fillColor: isTestVehicle ? '#FF9800' : (vehicle.status === 'active' ? '#4CAF50' : '#9E9E9E'),
             fillOpacity: 1,
-            strokeWeight: 1,
+            strokeWeight: 2,
             rotation: 0,
           },
         });
-        markersRef.current.set(vehicle.id, marker);
+        vehicleMarkersRef.current.set(vehicle.id, marker);
       } else {
+        // Update existing marker
         marker.setPosition(vehicle.position);
         const icon = marker.getIcon() as google.maps.Symbol;
+        const isTestVehicle = vehicle.id.includes('test');
         marker.setIcon({
           ...icon,
-          fillColor: vehicle.status === 'active' ? '#4CAF50' : '#9E9E9E',
+          fillColor: isTestVehicle ? '#FF9800' : (vehicle.status === 'active' ? '#4CAF50' : '#9E9E9E'),
         });
       }
     });
-  }, [vehicles]);
-
-  // Add route polyline
-  useEffect(() => {
-    if (!mapInstanceRef.current || !routePath) return;
-
-    const polyline = new google.maps.Polyline({
-      path: routePath,
-      geodesic: true,
-      strokeColor: '#4285F4',
-      strokeOpacity: 1.0,
-      strokeWeight: 3,
-    });
-
-    polyline.setMap(mapInstanceRef.current);
 
     return () => {
-      polyline.setMap(null);
+      vehicleMarkersRef.current.forEach(marker => marker.setMap(null));
+      vehicleMarkersRef.current.clear();
     };
-  }, [routePath]);
+  }, [vehicles, isTestEnvironment]);
 
-  // Add click handler to map
+  // Draw route history and stop markers
   useEffect(() => {
-    if (!mapInstanceRef.current || !onMapClick) return;
+    if (!mapInstanceRef.current || !showRouteHistory) return;
 
-    const listener = mapInstanceRef.current.addListener('click', onMapClick);
-    return () => {
-      google.maps.event.removeListener(listener);
-    };
-  }, [onMapClick]);
+    try {
+      // Clear existing markers
+      stopMarkersRef.current.forEach(marker => marker.setMap(null));
+      stopMarkersRef.current = [];
 
-  // Handle geofences
-  useEffect(() => {
-    if (!mapInstanceRef.current || !showGeofences) return;
+      // Filter route points based on environment and vehicle type
+      const routePoints = isTestEnvironment 
+        ? routeHistory.points 
+        : routeHistory.points.filter(() => vehicles.some(v => v.id === 'driver-1' && v.status === 'active'));
 
-    // Remove old circles
-    geofenceCirclesRef.current.forEach(circle => circle.setMap(null));
-    geofenceCirclesRef.current.clear();
+      const routeStops = isTestEnvironment
+        ? routeHistory.stops
+        : routeHistory.stops.filter(() => vehicles.some(v => v.id === 'driver-1' && v.status === 'active'));
 
-    // Add new circles
-    geofences.forEach(geofence => {
-      const circle = new google.maps.Circle({
-        map: mapInstanceRef.current,
-        center: geofence.center,
-        radius: geofence.radius,
-        fillColor: geofence.color,
-        fillOpacity: 0.2,
-        strokeColor: geofence.color,
-        strokeOpacity: 0.8,
-        strokeWeight: 2
+      // Draw route line
+      if (routeLineRef.current) {
+        routeLineRef.current.setMap(null);
+      }
+
+      if (routePoints.length > 0) {
+        routeLineRef.current = new google.maps.Polyline({
+          path: routePoints,
+          geodesic: true,
+          strokeColor: '#4285F4',
+          strokeOpacity: 1.0,
+          strokeWeight: 3,
+          map: mapInstanceRef.current
+        });
+      }
+
+      // Draw stop markers
+      routeStops.forEach(stop => {
+        const duration = stop.duration || 
+          (stop.endTime ? new Date(stop.endTime).getTime() - new Date(stop.startTime).getTime() : 
+          new Date().getTime() - new Date(stop.startTime).getTime());
+
+        if (duration >= 30000) { // 30 seconds threshold
+          const marker = new google.maps.Marker({
+            position: stop.position,
+            map: mapInstanceRef.current!,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: '#FF0000',
+              fillOpacity: 0.7,
+              strokeColor: '#FF0000',
+              strokeWeight: 2
+            },
+            title: `Stop Duration: ${Math.round(duration / 1000)} seconds`
+          });
+          stopMarkersRef.current.push(marker);
+        }
       });
-      geofenceCirclesRef.current.set(geofence.id, circle);
-    });
+
+    } catch (error) {
+      console.error('Error rendering route history:', error);
+    }
 
     return () => {
-      geofenceCirclesRef.current.forEach(circle => circle.setMap(null));
+      if (routeLineRef.current) {
+        routeLineRef.current.setMap(null);
+      }
+      stopMarkersRef.current.forEach(marker => marker.setMap(null));
+      stopMarkersRef.current = [];
     };
-  }, [geofences, showGeofences]);
+  }, [routeHistory, showRouteHistory, isTestEnvironment, vehicles]);
+
+  // Set up directions renderer
+  useEffect(() => {
+    if (directionsRenderer && mapInstanceRef.current) {
+      directionsRenderer.setMap(mapInstanceRef.current);
+    }
+    return () => {
+      if (directionsRenderer) {
+        directionsRenderer.setMap(null);
+      }
+    };
+  }, [directionsRenderer]);
 
   return (
     <div className="relative w-full h-[300px] sm:h-[400px] lg:h-[600px] rounded-xl overflow-hidden border border-neutral-200 shadow-card group">
@@ -163,11 +243,6 @@ const MapView: React.FC<MapViewProps> = ({ center, zoom, routePath, onMapClick, 
           </div>
         </div>
       )}
-      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <button className="p-2 bg-white/90 backdrop-blur-sm rounded-lg shadow-soft hover:bg-white transition-colors">
-          <MapIcon className="w-5 h-5 text-neutral-600" />
-        </button>
-      </div>
     </div>
   );
 };
