@@ -12,16 +12,8 @@ const navigationItems = [
   { id: 'driver-controls', icon: Car, label: 'Driver Controls' },
   { id: 'route-planning', icon: Map, label: 'Route Planning' },
   { id: 'live-tracking', icon: Navigation, label: 'Live Tracking' },
+  { id: 'testing', icon: Beaker, label: 'Testing Environment' }
 ].filter(Boolean);
-
-// Add testing environment only in development
-if (import.meta.env.DEV) {
-  navigationItems.push({
-    id: 'testing',
-    icon: Beaker,
-    label: 'Testing Environment'
-  });
-}
 
 const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPage }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
