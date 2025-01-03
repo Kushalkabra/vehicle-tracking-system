@@ -1,28 +1,104 @@
 import React, { useEffect } from 'react';
 import { useVehicleStore } from '../stores/vehicleStore';
 import { useState } from 'react';
-import { Navigation, AlertCircle, CheckCircle2, MapPin, Settings, Shield } from 'lucide-react';
+import { Navigation, AlertCircle, CheckCircle2, Shield } from 'lucide-react';
+import DebugPanel from '../components/DebugPanel';
+import { calculateDistance, initGeometryLibrary } from '../utils/maps';
+
+const UPDATE_INTERVAL = 30000; // 30 seconds in milliseconds
+const STOP_THRESHOLD = 30 * 1000; // 30 seconds for testing
+const MOVEMENT_THRESHOLD = 20; // 20 meters
 
 const DriverControls: React.FC = () => {
   const [error, setError] = useState<string>('');
+  const [intervalId, setIntervalId] = useState<number | null>(null);
   const { 
     updateVehiclePosition, 
     setDriverTracking, 
     isDriverTracking,
-    watchId 
+    addRoutePoint,
+    addStopPoint,
+    updateStopPoint 
   } = useVehicleStore();
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [lastPosition, setLastPosition] = useState<google.maps.LatLngLiteral | null>(null);
+  const [stopStartTime, setStopStartTime] = useState<Date | null>(null);
+  const [currentStopId, setCurrentStopId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isDriverTracking && !watchId) {
-      startTracking();
-    }
-    
-    return () => {
-      if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
-      }
-    };
+    initGeometryLibrary();
   }, []);
+
+  const checkForStop = (currentPosition: google.maps.LatLngLiteral) => {
+    if (!lastPosition) {
+      setLastPosition(currentPosition);
+      return;
+    }
+
+    const distance = calculateDistance(lastPosition, currentPosition);
+    console.log('Distance moved:', distance, 'meters');
+
+    // If vehicle hasn't moved significantly
+    if (distance < MOVEMENT_THRESHOLD) {
+      if (!stopStartTime) {
+        console.log('Vehicle stopped - starting timer');
+        setStopStartTime(new Date());
+        const newStopId = `stop-${Date.now()}`;
+        setCurrentStopId(newStopId);
+        addStopPoint(currentPosition);
+      } else {
+        const stopDuration = Date.now() - stopStartTime.getTime();
+        console.log('Stop duration:', stopDuration / 1000, 'seconds');
+        
+        if (stopDuration >= STOP_THRESHOLD && currentStopId) {
+          console.log('Stop threshold reached - recording stop');
+          updateStopPoint(currentStopId, new Date());
+        }
+      }
+    } else {
+      // Vehicle is moving
+      if (stopStartTime) {
+        console.log('Vehicle started moving - resetting stop timer');
+        setStopStartTime(null);
+        setCurrentStopId(null);
+      }
+    }
+
+    setLastPosition(currentPosition);
+  };
+
+  const updateLocation = () => {
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const currentPosition = { lat: latitude, lng: longitude };
+        
+        if (window.socket && window.socket.readyState === WebSocket.OPEN) {
+          window.socket.send(JSON.stringify({
+            type: 'driver-location',
+            vehicleId: 'driver-1',
+            position: currentPosition
+          }));
+        }
+
+        updateVehiclePosition('driver-1', latitude, longitude);
+        addRoutePoint(currentPosition);
+        checkForStop(currentPosition);
+        setLastUpdate(new Date());
+      },
+      (error) => {
+        setError(`Error: ${error.message}`);
+        stopTracking();
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      }
+    );
+  };
 
   const startTracking = async () => {
     try {
@@ -30,32 +106,14 @@ const DriverControls: React.FC = () => {
         throw new Error('Geolocation is not supported by your browser');
       }
 
-      const newWatchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          if (window.socket) {
-            window.socket.send(JSON.stringify({
-              type: 'driver-location',
-              vehicleId: 'driver-1',
-              position: { lat: latitude, lng: longitude }
-            }));
-          }
+      // Get initial position
+      updateLocation();
 
-          updateVehiclePosition('driver-1', latitude, longitude);
-        },
-        (error) => {
-          setError(`Error: ${error.message}`);
-          stopTracking();
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0
-        }
-      );
+      // Set up interval for regular updates
+      const newIntervalId = window.setInterval(updateLocation, UPDATE_INTERVAL);
+      setIntervalId(newIntervalId);
+      setDriverTracking(true, null);
 
-      setDriverTracking(true, newWatchId);
     } catch (err: any) {
       setError(err.message);
       stopTracking();
@@ -63,11 +121,35 @@ const DriverControls: React.FC = () => {
   };
 
   const stopTracking = () => {
-    if (watchId) {
-      navigator.geolocation.clearWatch(watchId);
+    if (intervalId) {
+      clearInterval(intervalId);
+      setIntervalId(null);
     }
     setDriverTracking(false, null);
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleMockUpdate = () => {
+      if (isDriverTracking) {
+        updateLocation();
+      }
+    };
+
+    document.addEventListener('mockLocationUpdate', handleMockUpdate);
+    
+    return () => {
+      document.removeEventListener('mockLocationUpdate', handleMockUpdate);
+    };
+  }, [isDriverTracking]);
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -80,7 +162,6 @@ const DriverControls: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Main Control Card */}
         <div className="bg-white rounded-xl shadow-card overflow-hidden">
           <div className="p-6">
             <div className="flex items-center space-x-3 mb-6">
@@ -124,6 +205,13 @@ const DriverControls: React.FC = () => {
               )}
             </button>
           </div>
+          {lastUpdate && (
+            <div className="p-4 bg-gray-50 rounded-lg mt-4">
+              <p className="text-sm text-gray-600">
+                Last Update: {lastUpdate.toLocaleTimeString()}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Status Card */}
@@ -138,51 +226,10 @@ const DriverControls: React.FC = () => {
                 <p className="text-sm text-gray-500">Current tracking information</p>
               </div>
             </div>
-
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Settings className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm font-medium text-gray-600">Status</span>
-                  </div>
-                  <span className={`text-sm font-medium ${
-                    isDriverTracking ? 'text-emerald-600' : 'text-gray-500'
-                  }`}>
-                    {isDriverTracking ? 'Tracking Active' : 'Tracking Disabled'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm font-medium text-gray-600">Location Updates</span>
-                  </div>
-                  <span className="text-sm font-medium text-gray-500">
-                    Every 30 seconds
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Shield className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm font-medium text-gray-600">Privacy</span>
-                  </div>
-                  <span className="text-sm font-medium text-gray-500">
-                    Location Only
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Additional Information */}
       <div className="bg-white rounded-xl shadow-card p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Location Tracking Information</h3>
         <div className="prose prose-sm text-gray-600 max-w-none">
@@ -199,6 +246,7 @@ const DriverControls: React.FC = () => {
           </ul>
         </div>
       </div>
+      <DebugPanel />
     </div>
   );
 };

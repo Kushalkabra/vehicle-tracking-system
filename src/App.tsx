@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import DriverControls from './pages/DriverControls';
 import RoutePlanningPage from './pages/RoutePlanningPage';
 import LiveTrackingPage from './pages/LiveTrackingPage';
+import TestingEnvironment from './pages/TestingEnvironment';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -26,6 +27,8 @@ function App() {
         return <RoutePlanningPage />;
       case 'live-tracking':
         return <LiveTrackingPage />;
+      case 'testing':
+        return <TestingEnvironment />;
       default:
         return <DashboardPage />;
     }
@@ -33,20 +36,7 @@ function App() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          className: 'glass',
-          duration: 4000,
-          style: {
-            background: 'rgba(255, 255, 255, 0.9)',
-            color: '#1f2937',
-            padding: '16px',
-            borderRadius: '12px',
-            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.08)',
-          },
-        }}
-      />
+      <Toaster position="top-right" />
       
       <Sidebar onNavigate={setCurrentPage} currentPage={currentPage} />
       

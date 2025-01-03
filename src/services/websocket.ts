@@ -12,6 +12,22 @@ export const initializeWebSocket = () => {
 
   socket.onopen = () => {
     console.log('Connected to WebSocket server');
+    
+    // Restart tracking if it was active
+    if (store.isDriverTracking) {
+      // Re-establish tracking after reconnection
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          socket.send(JSON.stringify({
+            type: 'driver-location',
+            vehicleId: 'driver-1',
+            position: { lat: latitude, lng: longitude }
+          }));
+        },
+        (error) => console.error('Error getting position:', error)
+      );
+    }
   };
 
   socket.onmessage = (event) => {

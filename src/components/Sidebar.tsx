@@ -1,10 +1,26 @@
 import React from 'react';
-import { LayoutDashboard, Car, Menu, Map, Navigation, X } from 'lucide-react';
+import { LayoutDashboard, Car, Menu, Map, Navigation, X, Beaker } from 'lucide-react';
 import { useState } from 'react';
 
 interface SidebarProps {
   onNavigate: (page: string) => void;
   currentPage: string;
+}
+
+const navigationItems = [
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { id: 'driver-controls', icon: Car, label: 'Driver Controls' },
+  { id: 'route-planning', icon: Map, label: 'Route Planning' },
+  { id: 'live-tracking', icon: Navigation, label: 'Live Tracking' },
+].filter(Boolean);
+
+// Add testing environment only in development
+if (import.meta.env.DEV) {
+  navigationItems.push({
+    id: 'testing',
+    icon: Beaker,
+    label: 'Testing Environment'
+  });
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPage }) => {
@@ -62,12 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPage }) => {
         
         <nav className="p-4">
           <ul className="space-y-1">
-            {[
-              { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-              { id: 'driver-controls', icon: Car, label: 'Driver Controls' },
-              { id: 'route-planning', icon: Map, label: 'Route Planning' },
-              { id: 'live-tracking', icon: Navigation, label: 'Live Tracking' }
-            ].map(item => (
+            {navigationItems.map(item => (
               <li key={item.id}>
                 <button 
                   onClick={() => onNavigate(item.id)}

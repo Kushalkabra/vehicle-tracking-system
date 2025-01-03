@@ -6,5 +6,5 @@ export interface Vehicle {
     lng: number;
   };
   status: 'active' | 'inactive';
-  lastUpdate: Date;
+  lastUpdate: Date | string | null;
 }
